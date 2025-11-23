@@ -10,7 +10,7 @@ fit_HMM <- function(series, real_reg = NULL, sdds = "t"){
   
   my_data_df <- data.frame(
     Date = date_sequence,
-    price = series
+    price = seriess
   )
   
   # followed the example
