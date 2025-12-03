@@ -1,5 +1,5 @@
 
-simulate_heston <- function(S0, v0, Reg_series, Reg_param, T, N, M, method = "E", seed = 999, min_var = 1e-12) {
+simulate_heston <- function(S0, v0, Reg_series, Reg_param, T, N, M, method = "E", seed = 999, min_var = 1e-6) {
   if (!is.null(seed)) set.seed(seed)
   
   # Check Feller (just warn)
@@ -7,8 +7,11 @@ simulate_heston <- function(S0, v0, Reg_series, Reg_param, T, N, M, method = "E"
       2 * Reg_param[2,2] * Reg_param[2,3] < Reg_param[2,4]^2) {
     message("Warning: Feller condition (2*kappa*theta > sigma^2) NOT satisfied in at least one regime.")
   }
-  
-  dt <- T / N
+  N <-  N * 100
+  Reg_series <- rep(Reg_series, each = 100)
+
+  dt <- (T / N) 
+
   sqrt_dt <- sqrt(dt)
   method <- toupper(method)
   
@@ -16,7 +19,6 @@ simulate_heston <- function(S0, v0, Reg_series, Reg_param, T, N, M, method = "E"
   V_paths <- matrix(0, nrow = M, ncol = N + 1)
   S_paths[, 1] <- S0
   V_paths[, 1] <- v0
-  
   for (i in 1:N) {
     reg_index <- Reg_series[i] + 1
     mu_curr <- Reg_param[reg_index, 1]
@@ -76,11 +78,18 @@ simulate_heston <- function(S0, v0, Reg_series, Reg_param, T, N, M, method = "E"
     
     # asset dynamics - use variance at previous step (explicit)
     S_prev <- S_paths[, i]
-    S_paths[, i + 1] <- S_prev + mu_curr * S_prev * dt + S_prev * sqrt_V_prev * dW1
-  }
-  
+    # S_paths[, i + 1] <- S_prev + mu_curr * S_prev * dt + S_prev * sqrt_V_prev * dW1
+    S_paths[, i + 1] <- S_prev * exp((mu_curr - 0.5 * V_prev_raw) * dt + sqrt_V_prev * dW1)
+    
+    }
+
+  sample_indices <- seq(1, N + 1, by = 100)
+
+  S_paths<- S_paths[, sample_indices]
+  V_paths <- V_paths[, sample_indices]
   return(list(S_paths = S_paths, V_paths = V_paths, method_used = method))
 }
+
 
 
 

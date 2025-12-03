@@ -126,22 +126,30 @@ Heston_get_init<- function(
     # diag(Gamma) <- 0.9
     
     
+    
+    
     Gamma <- matrix(NA, states, states)
+    
     for (i in 1:states) {
       indices_i <- which(cluster[1:(length(cluster) - 1)] == i)
+      
       if (length(indices_i) == 0) {
+        Gamma[i, ] <- 1 / states 
         next
       }
-    
-      N_i <- length(indices_i) 
+      
+      N_i <- length(indices_i)
+      numerator_row <- numeric(states) 
       
       for (j in 1:states) {
         N_ij <- sum(cluster[indices_i + 1] == j)
-        N_ij <- max(N_ij, 1e-3)
-        Gamma[i, j] <- N_ij / N_i
+        numerator_row[j] <- max(N_ij, 1e-2) 
       }
-    }
 
+      S_i <- sum(numerator_row)
+      
+      Gamma[i, ] <- numerator_row / S_i 
+    }
     
     kappa_est <- numeric(states)
     theta_est <- numeric(states)
@@ -192,14 +200,15 @@ Heston_get_init<- function(
       kappa_est[s] <- max(kappa_s_raw, 1e-3)
       
       # if(s == 1 ){
-      #   kappa_est[s] = 5
+      #   kappa_est[s] = 2
+      #   theta_est[s] = 0.1
+      #   sigma_est[s] = 0.1
       # }else{
-      #   kappa_est[s] = 3
+      #   kappa_est[s] = 1
+      #   theta_est[s] = 0.2
+      #   sigma_est[s] = 0.1
       # }
-      # kappa_est[s] <- 10
     }
-    # kappa_est[1] <- 1
-    # kappa_est[2] <- 3
     list(
       "cluster" = cluster,
       "pars" = list(
@@ -287,7 +296,7 @@ Heston_get_init<- function(
     parameter_class <- gsub("_.*", "", names(initial_estimate))
     for (class in unique(parameter_class)) {
       id <- which(parameter_class == class)
-      jittered[, id] <- jitter(jittered[, id], factor = 2)
+      jittered[, id] <- jitter(jittered[, id], factor = 5)
     }
 
     lapply(seq_len(N), function(i) {

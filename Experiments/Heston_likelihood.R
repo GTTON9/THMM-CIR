@@ -17,14 +17,19 @@
 #'
 #' @keywords internal
 
+# install.packages("Bessel")
+# library(Bessel)
 Heston_nLL_hmm <- function(parUncon, observations, controls) {
 
   class(parUncon) <- "parUncon"
   T <- length(observations)
-
+  
   nstates <- controls[["states"]][1]
 
   par <- parUncon2par_heston(parUncon, controls, FALSE, numerical_safeguard = TRUE)
+  Heston_trace$par_list[[length(Heston_trace$par_list) + 1]] <- par
+  
+  
   # print("----- likelihood par-----")
   # print(par)
   sdd <- controls[["sdds"]][[1]]$name
@@ -43,14 +48,14 @@ Heston_nLL_hmm <- function(parUncon, observations, controls) {
   kappa <- par[["kappa"]]
   theta <- par[["theta"]]
   sigma <- par[["sigma"]]
+  # kappa <- c(10,5)
 
   allprobs <- matrix(NA_real_, nstates, T-1)
   for (i in 1:nstates) {
     if (sdd == "Heston") {
         
         allprobs[i, ] <- get_transition_density_heston_ln(observations, kappa[i], theta[i], sigma[i])
-        # allprobs[i, ] <- get_transition_density_Gaussain(observations, kappa[i], theta[i], sigma[i])
-    } 
+        } 
     
     else {
       stop("Unknown state-dependent distribution", call. = FALSE)
@@ -66,17 +71,13 @@ Heston_nLL_hmm <- function(parUncon, observations, controls) {
   # -LL_HMM_Rcpp(allprobs, Gamma, delta, nstates, T)
 
 }
-
-get_transition_density_Gaussain <- function(observations, kappa, theta, sigma){
-  
+get_transition_density_Gaussian <- function(observations, kappa, theta, sigma){
   T_obs <- length(observations)
-  
   all_ln_densities <- numeric(T_obs - 1) 
   
   for (t in 1:(T_obs - 1)) {
-    
     V_t <- observations[t]
-    V_t_plus_k <- observations[t + 1] # k=1
+    V_t_plus_k <- observations[t + 1]
     transition_density <- get_gaussian_approx_density(
       V_t, V_t_plus_k, 
       kappa = kappa, theta = theta, sigma = sigma, 
@@ -84,130 +85,149 @@ get_transition_density_Gaussain <- function(observations, kappa, theta, sigma){
     
     all_ln_densities[t] <- transition_density
   }
-  
-  # print(all_ln_densities)
   return(all_ln_densities)
 }
 
 
 get_transition_density_heston_ln <- function(observations, kappa, theta, sigma) {
   T_obs <- length(observations)
-  
+
   all_ln_densities <- numeric(T_obs - 1) 
   
   for (t in 1:(T_obs - 1)) {
  
     V_t <- observations[t]
-    V_t_plus_k <- observations[t + 1] # k=1
+    V_t_plus_k <- observations[t + 1]
     
     ln_transition_density <- ln_d_Heston(
       V_t = V_t, 
       V_t_plus_k = V_t_plus_k, 
-      k = 1, kappa = kappa, theta = theta, sigma = sigma
+      k = 1/252, kappa = kappa, theta = theta, sigma = sigma
     )
     
-    all_ln_densities[t] <- exp(ln_transition_density)
+    all_ln_densities[t] <- (ln_transition_density)
   }
 
- #  print(all_ln_densities)
   return(all_ln_densities)
 }
 
 
+# 
+# ln_d_Heston <- function(V_t, V_t_plus_k, k = 1/252, kappa, theta, sigma) {
+#   
+#   # --- 1. 参数计算 ---
+#   sigma <- max(sigma, 1e-8)
+#   exp_k <- exp(-kappa * k)
+#   den_factor <- (1 - exp_k) * (sigma^2)
+#   
+#   if(abs(den_factor) < 1e-10) return(-Inf) 
+#   
+#   C <- 2 * kappa / den_factor
+#   q <- (2 * kappa * theta) / (sigma^2) - 1 # 
+#   u <- C * V_t * exp_k
+#   v <- C * V_t_plus_k
+#   z_arg <- 2 * sqrt(u * v) 
+#   
+#   bessel_val <- tryCatch({
+#     BesselI(z_arg, nu = q, expon.scaled = TRUE) 
+#   }, error = function(e) {
+#     besselI(z_arg, nu = q, expon.scaled = TRUE)
+#   })
+#   
+#   
+#   if (is.finite(bessel_val) && bessel_val > 0) {
+#     ln_I_q <- z_arg + log(bessel_val)
+#     
+#   } else {
+#     
+#     
+#     q_abs <- abs(q)
+#     
+#     if (z_arg > 100 && q_abs < z_arg / 5) {
+#       # besselIasym for large z regular q
+#       ln_I_q <- tryCatch({
+#         besselIasym(z_arg, nu = q, log = TRUE)
+#       }, error = function(e) {
+#         # DLMF 10.40.1: I_q(z) ≈ exp(z) / sqrt(2*pi*z) (z -> ∞)
+#         warning(paste("besselIasym failed for z =", z_arg, 
+#                       ". Switching to large-z asymptotic approximation (DLMF 10.40.1). Original error:", 
+#                       conditionMessage(e)))
+#         z_arg - 0.5 * log(2 * pi * z_arg)
+#       })
+#       
+#       
+#     } else if (q_abs > 10 && q_abs > z_arg * 1.2) {
+#       # for large q regular z
+#       # besselI.nuAsym (nu >= 0)
+#       ln_I_q <- tryCatch({
+#         besselI.nuAsym(z_arg, nu = q_abs, log = TRUE, k.max = 5)
+#       }, error = function(e) {
+#         # q * (1 + log(z / (2 * q))) - 0.5 * log(2 * pi * q)
+#         # DLMF 10.41.1
+#         warning(paste("besselI.nuAsym failed for q =", q_abs, 
+#                       ". Switching to asymptotic approximation (DLMF 10.41.1). Original error:", 
+#                       conditionMessage(e)))
+#         
+#         q_abs * (1 + log(z_arg / (2 * q_abs))) - 0.5 * log(2 * pi * q_abs)
+#       })
+#       
+#     } else {
+#       # ratio_abs <- z_arg / q_abs
+#       # r <- sqrt(1 + ratio_abs^2)
+#       # # eta = r + log(ratio_abs / (1 + r))
+#       # eta <- r + log(ratio_abs) - log(1 + r)
+#       # 
+#       # # ln_I_q ≈ |q| * eta - 0.5 * log(2 * pi * |q| * r)
+#       # ln_I_q <- q_abs * eta - 0.5 * log(2 * pi * q_abs * r)
+#       # 
+#       # 
+#       # 
+#       mu_approx <- V_t + kappa * (theta - V_t) * k
+# 
+#       # Variance: Var[V_{t+k} | V_t] ≈ diffusion^2 * k = (sigma^2 * V_t) * k
+#       variance_approx <- (sigma^2) * V_t * k
+# 
+#       # Ensure standard deviation is positive
+#       sd_approx <- sqrt(pmax(variance_approx, 1e-8))
+# 
+#       # Calculate the log density using the Normal distribution
+#       ln_density <- dnorm(V_t_plus_k, mean = mu_approx, sd = sd_approx, log = TRUE)
+#       return(ln_density)
+#     }
+#   }
+# 
+#   log_vu_ratio <- 0
+#   if(u > 1e-10 && v > 1e-10) {
+#     log_vu_ratio <- log(v / u)
+#   }
+#   
+#   ln_density <- log(C) - u - v + (q / 2) * log_vu_ratio + ln_I_q
+#   
+#   return(ln_density)
+# }
 
 
-ln_d_Heston<- function(V_t, V_t_plus_k, k = 1, kappa, theta, sigma,
-                               min_val = 1e-300, z_large_threshold = 50) {
-  # numeric safety
-  sigma <- max(sigma, 1e-12)
-  exp_k <- exp(-kappa * k)
-  den <- (1 - exp_k) * (sigma^2)
-  if (abs(den) < 1e-16) return(-Inf)
+
+ln_d_Heston <- function(V_t, V_t_plus_k, 
+                                   k = 1/252, 
+                                   kappa, theta, sigma,
+                                   min_val = 1e-300) {
+  # ---- 1. Compute Constants ----
+  ek <- exp(-kappa * k)
   
-  C <- 2 * kappa / den
-  q <- (2 * kappa * theta) / (sigma^2) - 1
+  c  <- (sigma^2 * (1 - ek)) / (4 * kappa)
+  d  <- 4 * kappa * theta / sigma^2
+  lambda <- (4 * kappa * ek / (sigma^2 * (1 - ek))) * V_t
   
-  # ensure nonnegative V inputs
-  V_t <- pmax(V_t, 0)
-  V_tp <- pmax(V_t_plus_k, 0)
+  # Avoid numerical blowups
+  c      <- max(c,  min_val)
+  d      <- max(d,  min_val)
+  lambda <- max(lambda, min_val)
+  V_ratio <- V_t_plus_k / c
   
-  u <- C * V_t * exp_k
-  v <- C * V_tp
+  # ---- 2. Compute noncentral chi-square density ----
+  dens <- dchisq(V_ratio, df = d, ncp = lambda, log = FALSE)
   
-  # clamp to avoid exact zeros causing log(0)
-  u <- pmax(u, min_val)
-  v <- pmax(v, min_val)
-  
-  sqrt_u <- sqrt(u)
-  sqrt_v <- sqrt(v)
-  z <- 2 * sqrt_u * sqrt_v  # 2*sqrt(uv)
-  
-  # compute log(v/u) robustly
-  log_vu_ratio <- 0
-  if (u > 0 && v > 0) {
-    # use log difference (more stable)
-    log_vu_ratio <- log(v) - log(u)
-  }
-  
-  ln_Iq <- NA_real_
-  
-  # Try scaled bessel first (preferred if reliable)
-  success_scaled <- FALSE
-  if (is.finite(z) && z >= 0) {
-    # Protect bessel call in tryCatch
-    scaled_val <- tryCatch(besselI(z, nu = q, expon.scaled = TRUE),
-                           error = function(e) NA_real_,
-                           warning = function(w) NA_real_)
-    if (!is.na(scaled_val) && is.finite(scaled_val) && scaled_val > 0) {
-      ln_Iq <- z + log(scaled_val)  # log(I_q(z)) = z + log(I_q(z)*exp(-z))
-      success_scaled <- TRUE
-    }
-  }
-  
-  # If scaled bessel is not good, use asymptotics depending on regime
-  if (!success_scaled) {
-    # decide regime: large z (argument dominates), large order, or uniform Olver
-    if (z > z_large_threshold) {
-      # large-argument asymptotic (z >> q case also lands here)
-      # log I_q(z) ≈ z - 0.5*log(2*pi*z) + small correction
-      ln_Iq <- z - 0.5 * log(2 * pi * pmax(z, 1e-300))
-      
-    } else if (abs(q) > 50 && (z / abs(q)) < 0.8) {
-      # large order, small ratio (use large-nu expansion)
-      q_abs <- abs(q)
-      ln_Iq <- q_abs * (1 + log(pmax(z/(2*q_abs), 1e-300))) - 0.5 * log(2 * pi * q_abs)
-      
-    } else {
-      # uniform Olver-type expansion (safe middle-ground)
-      q_abs <- max(abs(q), 1e-12)
-      t <- z / q_abs
-      r <- sqrt(1 + t^2)
-      eta <- r + log( pmax(t, 1e-300) ) - log(1 + r)
-      ln_Iq <- q_abs * eta - 0.5 * log(2 * pi * q_abs * r)
-    }
-  }
-  
-  # Now assemble log-density but avoid catastrophic cancellation
-  # Original: ln = log(C) - u - v + (q/2) * log(v/u) + ln_Iq
-  # Use identity: -u - v + z = - (sqrt(u) - sqrt(v))^2
-  # If ln_Iq used asymptotic with leading term z, separate that out.
-  
-  # Determine if ln_Iq was formed with explicit 'z' included.
-  # We will compute the combination -u - v + ln_Iq stably:
-  
-  # If ln_Iq uses leading z term (our asymptotic choices include it),
-  # compute residual = ln_Iq - z and then use identity for -u - v + z.
-  # If scaled bessel was used, ln_Iq already contains z; same logic applies.
-  
-  residual <- ln_Iq - z  # may be small negative (e.g., -0.5*log(2*pi*z))
-  # compute stable quadratic term:
-  quad_term <- - (sqrt_u - sqrt_v)^2
-  
-  # assemble:
-  ln_density <- log(abs(C)) + quad_term + residual + (q / 2) * log_vu_ratio
-  
-  # If any NaN/Inf appear, fall back to a safe large-negative value:
-  if (!is.finite(ln_density)) ln_density <- -1e300
-  
-  return(ln_density)
+  # Adjust for variable transformation (divide by c)
+  return(log(dens / c))
 }

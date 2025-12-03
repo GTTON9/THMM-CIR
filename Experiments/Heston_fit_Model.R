@@ -84,12 +84,11 @@ Heston_fit_model <- function (data, controls = data[["controls"]], fit = list(),
   
   initial_values <- Heston_get_init(data = data, ncluster = ncluster, # problem
                                        seed = seed, verbose = verbose, initial_estimate = initial_estimate)
-
+  
   # check nstate match the true regime
   runs <- length(initial_values)
 
-  target <- ifelse(!data[["controls"]][["hierarchy"]], Heston_nLL_hmm, 
-                   Heston_nLL_hmm)
+  target <- Heston_nLL_hmm
 
   if (verbose) {
     pb <- progress::progress_bar$new(format = "[:bar] :percent, :eta ETA", 
@@ -98,6 +97,8 @@ Heston_fit_model <- function (data, controls = data[["controls"]], fit = list(),
     pb$message("Maximizing likelihood...")
   }
 
+  
+  
 
   start_time <- Sys.time()
   if (ncluster == 1) {
@@ -106,6 +107,12 @@ Heston_fit_model <- function (data, controls = data[["controls"]], fit = list(),
       if (verbose) 
         pb$tick(0)
       suppressWarnings({
+        
+        parameter_history <- list(
+          par_uncon = list(),
+          nll_value = numeric()
+        )
+        
         mod <- try(
           stats::nlm(f = target, p = initial_values[[run]], 
                               observations = data[["data"]], controls = data[["controls"]], 
@@ -130,38 +137,7 @@ Heston_fit_model <- function (data, controls = data[["controls"]], fit = list(),
         pb$tick()
     }
   }
-  else if (ncluster > 1) {
-    cluster <- parallel::makeCluster(ncluster)
-    doSNOW::registerDoSNOW(cluster)
-    opts <- if (verbose) 
-      list(progress = function(n) pb$tick())
-    else list()
-    mods <- foreach::foreach(run = seq_len(runs), .packages = "fHMM", 
-                             .options.snow = opts) %dopar% {
-                               if (verbose) 
-                                 pb$tick(0)
-                               suppressWarnings({
-                                 mod <- try(stats::nlm(f = target, p = initial_values[[run]], 
-                                                       observations = data[["data"]], controls = data[["controls"]], 
-                                                       iterlim = data[["controls"]][["fit"]][["iterlim"]], 
-                                                       steptol = data[["controls"]][["fit"]][["steptol"]], 
-                                                       gradtol = data[["controls"]][["fit"]][["gradtol"]], 
-                                                       print.level = data[["controls"]][["fit"]][["print.level"]], 
-                                                       hessian = FALSE), silent = FALSE)
-                               })
-                               if (verbose) 
-                                 pb$tick()
-                               accept_run <- !inherits(mod, "try-error") && mod[["code"]] %in% 
-                                 data[["controls"]][["fit"]][["accept"]]
-                               if (accept_run) {
-                                 mod
-                               }
-                               else {
-                                 NA
-                               }
-                             }
-    parallel::stopCluster(cluster)
-  }
+
   end_time <- Sys.time()
   lls <- -unlist(sapply(mods, `[`, "minimum"), use.names = FALSE)
   if (all(is.na(lls))) {

@@ -11,16 +11,17 @@ source("fHMM_model.R")
 source("Heston_decode.R")
 source("Heston_likelihood.R")
 
-Gen_fit <- function(mu, kappa, theta, sigma, rho, gen_length = 250, V_0 = 0.03, S0 = 100,  V_ = TRUE , plot_path = TRUE){
+Gen_fit <- function(Gamma, mu, kappa, theta, sigma, rho, gen_length = 252, V_0 = 0.03, S0 = 100,  V_ = TRUE , plot_path = TRUE, seed = 999){
   # V_: whether we know the volatility process
   
   set.seed(999)
-  Reg_chain <- simulate_Reg(series_length = N)
+  N <- gen_length
+  Reg_chain <- simulate_Reg(series_length = N, Reg_tran = Gamma)
   Reg_param <- cbind(mu, kappa, theta, sigma, rho)
-  sim_series  <- simulate_heston(S0, v0, Reg_chain, Reg_param, T, N, M=1, method = "E_C")
-  S_simulated <- sim_series$S_paths[1,]
+  sim_series  <- simulate_heston(S0, v0, Reg_chain, Reg_param, T, N, M=1, method = "E", seed = seed)
+  S_simulated <- sim_series$S_paths
   
-  V_simulated <- sim_series$V_paths[1,]
+  V_simulated <- sim_series$V_paths
   
   
   par(mfrow = c(1, 2))
@@ -65,7 +66,8 @@ Gen_fit <- function(mu, kappa, theta, sigma, rho, gen_length = 250, V_0 = 0.03, 
     data_column = "price",      
     logreturns  = FALSE,         
     from        = date_sequence[1],             
-    to          = date_sequence[length(date_sequence)]
+    to          = date_sequence[length(date_sequence)],
+    runs = 10
   )
   
   
@@ -81,20 +83,15 @@ Gen_fit <- function(mu, kappa, theta, sigma, rho, gen_length = 250, V_0 = 0.03, 
   param <- parUncon2par_heston(final_model$estimate, series_control, FALSE, numerical_safeguard = TRUE)
   
   
+  p <- plot_viterbi(V_simulated, nstates, param$Gamma, 
+               param$kappa, param$theta, 
+               param$sigma, states_estimate)
+  plot(p)
+  
+  
   return(list(states_estimate = states_estimate, 
               param = param))
 }
-
-
-
-mu <- c(0.5, 0.5)
-kappa <- c(10, 5)
-theta <- c(0.03, 0.6)
-sigma <- c(0.05, 0.05)
-rho <- c(-0.1, -0.1)
-
-
-Gen_fit(mu, kappa, theta, sigma, rho, V_ = TRUE , plot_path = TRUE)
 
 
 

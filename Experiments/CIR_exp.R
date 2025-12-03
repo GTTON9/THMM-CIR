@@ -25,14 +25,14 @@ Reg_param_theta <- matrix(
                                       
 # 62-144 regime change
 sim_series  <- simulate_heston(S0, v0, Reg_chain, Reg_param_theta, T, N, M=1, method = "M")
-S_simulated <- sim_series$S_paths[1,]
+S_simulated <- sim_series$S_paths
 plot(S_simulated,  type = "l")
 # S_mu_model <- fit_HMM(S_simulated, Reg_chain)
 # summary(S_mu_model)
 # S_mu_model
 
 
-V_simulated <- sim_series$V_paths[1,]
+V_simulated <- sim_series$V_paths
 # V_mu_model <- fit_HMM(V_simulated, Reg_chain)
 plot(V_simulated, type = "l")
 # plot(S_simulated, type = "l")

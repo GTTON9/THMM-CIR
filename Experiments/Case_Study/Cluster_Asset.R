@@ -1,108 +1,10 @@
-get_init<- function(data, states) {
-  
-  # initial clustering
-  cluster <- stats::kmeans(
-    data[!is.na(data)], centers = states, iter.max = 100, nstart = 100
-  )$cluster
-  print("cluster")
-  print(cluster)
-  
-  # Gamma <- matrix(0.1 / (states - 1), nrow = states, ncol = states)
-  # diag(Gamma) <- 0.9
-  
-  
-  Gamma <- matrix(NA, states, states)
-  for (i in 1:states) {
-    indices_i <- which(cluster[1:(length(cluster) - 1)] == i)
-    if (length(indices_i) == 0) {
-      next
-    }
-    
-    N_i <- length(indices_i) 
-    
-    for (j in 1:states) {
-      N_ij <- sum(cluster[indices_i + 1] == j)
-      Gamma[i, j] <- N_ij / N_i
-    }
-  }
-  print(Gamma)
-  
-  kappa_est <- numeric(states)
-  theta_est <- numeric(states)
-  sigma_est <- numeric(states)
-  
-  
-  dt <- 1/252
-  
-  Delta_Xt <- diff(data)
-  Xt_lag <- data[-length(data)]
-  
-  cluster_lag <- cluster[-length(cluster)]
-  
-  for (s in seq_len(states)) {
-    
-    Xt_s <- data[cluster == s]
-    
-    # theta (numerical protection)
-    theta_s <- mean(Xt_s, na.rm = TRUE)
-    theta_est[s] <- max(theta_s, 1e-6)
-    
-    # sigma (numerical protection)
-    sigma_s_base <- sd(Xt_s, na.rm = TRUE)
-    sigma_est[s] <- sigma_s_base
-    
-    
-    indices_s <- which(cluster_lag == s)
-    print(indices_s)
-    if (length(indices_s) < 3) {
-      warning(paste("State", s, "has too few observations for OLS. Using default kappa = 1.0"))
-      kappa_est[s] <- 2
-      next 
-    }
-    
-    Delta_Xt_s <- Delta_Xt[indices_s]
-    Xt_lag_s <- Xt_lag[indices_s]
-    
-    ols_model_s <- lm(Delta_Xt_s ~ Xt_lag_s)
-    
-    # question is, there are several sequences of OLS, shall we weigh them and get the estimate?
-    
-    beta_hat <- coef(ols_model_s)["Xt_lag_s"]
-    alpha_hat <- coef(ols_model_s)["(Intercept)"]
-    
-    print(beta_hat)
-    print(paste("kappa (by alpha):",alpha_hat/(dt*theta_s)))
-    kappa_s_raw <- -beta_hat / dt
-    print(paste("kappa (by beta):",kappa_s_raw))
-    # numerical protection
-    kappa_est[s] <- max(kappa_s_raw, 1e-3)
-  }
-  
-  list(
-    "cluster" = cluster,
-    "pars" = list(
-      "kappa" = kappa_est, 
-      "theta" = theta_est, 
-      "sigma" = sigma_est, 
-      "Gamma" = Gamma
-    )
-  )
-}
 
-
-
-T =1
-N = 250
-v0 = 0.03
+source("Model_Simulation.R")
+T =1 
+N = 1000
+v0 = 0.3
 S0 =100
 
-
-mu <- matrix(c(), nrow = 1)
-kappa <- matrix()
-theta <- matrix()
-sigma <- matrix()
-rho <- matrix()
- 
 
 Reg_chain <- simulate_Reg(series_length = N)
 plot(Reg_chain)
@@ -110,7 +12,7 @@ Reg_param <- matrix(
   
   # feller condition: 2 * kappa * theta > sigma^2
   c( # mu, kappa, theta, sigma, rho
-    0.5,   10,    0.03,   0.05,  -0.1, # calm
+    0.5,   10,    0.3,   0.05,  -0.1, # calm
     0.5,   5,     0.6,   0.05,  -0.1 # turbulent
   ),
   nrow = 2,
@@ -120,122 +22,37 @@ Reg_param <- matrix(
 
 
 # 62-144 regime change
-sim_series  <- simulate_heston(S0, v0, Reg_chain, Reg_param, T = 0.5, N, M=1, method = "M")
-S_simulated <- sim_series$S_paths[1,]
+sim_series  <- simulate_heston(S0, v0, Reg_chain, Reg_param, T = 0.5, N, M=1, method = "E")
+S_simulated <- sim_series$S_paths
 plot(S_simulated,  type = "l")
 
-V_simulated <- sim_series$V_paths[1,]
+V_simulated <- sim_series$V_paths
 plot(V_simulated, type = "l")
-
-
-plot(S_simulated, type = "l")
-plot(diff(V_simulated), type = "l")
-plot(diff(log(S_simulated)), type = "l")
-
-
-
-
 
 
 
 
 log_returns <- diff(log(S_simulated)) 
-volatility_proxy <- log_returns^2 * 252 
+volatility_proxy <- abs(log_returns) * sqrt(252)
+
+
 plot(V_simulated, type = 'l', ylim = c(0,1))
 lines(volatility_proxy, col = "blue")
-
+lines(lowess(volatility_proxy, f = 0.2), col = "red")
+lowess_proxy <- lowess(volatility_proxy, f = 0.2)
+# volatility_proxy <- lowess(volatility_proxy, f = 0.001)
 # volatility_proxy <- log(volatility_proxy)
 states <- 2 
 
 cluster_results <- stats::kmeans(
-  volatility_proxy[!is.na(10 * volatility_proxy)], 
+  volatility_proxy[!is.na(lowess_proxy)], 
   centers = states, 
   iter.max = 100, 
   nstart = 100 
 )
 cluster_assignment <- cluster_results$cluster 
-plot(Reg_chain+1, col = "blue")
-lines(cluster_assignment)
-
-
-
-
-
-
-
-
-
-
-# --- 1. Define Input Data and Time Step ---
-
-# V_simulated: Your input volatility series (standard deviation)
-# Assuming V_simulated is already loaded, e.g.,
-# V_simulated <- sqrt(V_simulated_variance)
-
-# Determine the time step (assuming daily data, t is in years)
-Delta_t <- 1 / 252 
-
-# --- 2. Calculate the Variance Proxy (v_t) ---
-
-# The Heston model uses variance (v_t), which is (volatility)^2
-v_t <- V_simulated
-
-# --- 3. Prepare Lagged Data for Regression ---
-
-# Dependent variable: v_{i+1}
-v_i_plus_1 <- v_t[2:length(v_t)]
-
-# Independent variable: v_i
-v_i <- v_t[1:(length(v_t) - 1)]
-
-# --- 4. Run the Linear Regression ---
-
-# Regression model: v_{i+1} = alpha + beta * v_i
-model <- lm(v_i_plus_1 ~ v_i)
-
-# Extract coefficients
-alpha_hat <- coef(model)[1] # Intercept (alpha)
-beta_hat <- coef(model)[2]  # Slope (beta)
-
-# --- 5. Calculate Heston Parameter Estimators ---
-
-# Heston Kappa (\kappa) Estimate (Mean-reversion rate)
-# Formula: \hat{\kappa} = (1 - \hat{\beta}) / \Delta t
-kappa_hat <- (1 - beta_hat) / Delta_t
-
-# Heston Theta (\theta) Estimate (Long-term mean variance)
-# Formula: \hat{\theta} = \hat{\alpha} / (\hat{\kappa} * \Delta t)
-# Check for stability before dividing by kappa_hat
-if (kappa_hat > 1e-6) {
-  theta_hat <- alpha_hat / (kappa_hat * Delta_t)
-} else {
-  # If kappa is near zero or negative, the process is unstable,
-  # and theta estimate is unreliable.
-  theta_hat <- alpha_hat / (1 - beta_hat) # Alternative division
-}
-
-
-# --- 6. Output Results and Sanity Check ---
-
-cat("--- Heston Initial Estimator Results from Volatility Series ---\n")
-cat(sprintf("Time Step (Delta_t): %.6f\n", Delta_t))
-cat(sprintf("Regression Beta (\u03B2\u0302): %.6f\n", beta_hat))
-cat(sprintf("Regression Alpha (\u03B1\u0302): %.10f\n", alpha_hat))
-cat("\n")
-
-if (kappa_hat > 0) {
-  cat(sprintf("Initial Kappa Estimate (\u03BA\u0302): %.4f (per year)\n", kappa_hat))
-  cat(sprintf("Initial Theta Estimate (\u03B8\u0302): %.8f (Variance, annualised)\n", theta_hat))
-  cat(sprintf("Implied Long-Term Volatility (\u221A\u03B8\u0302): %.4f\n", sqrt(theta_hat)))
-} else {
-  cat(sprintf("Warning: Estimated \u03BA\u0302 (%.4f) is non-positive or near zero. \n", kappa_hat))
-  cat("This suggests the mean-reversion assumption may not hold for this data.\n")
-  # Provide a stable, albeit arbitrary, fallback for optimization initialization
-  kappa_hat_fallback <- 0.5
-  theta_hat_fallback <- mean(v_t)
-  cat(sprintf("Using Fallback Initial Estimates: \u03BA = %.2f, \u03B8 = %.8f\n", 
-              kappa_hat_fallback, theta_hat_fallback))
-}
+plot(cluster_assignment, col = "blue")
+lines(Reg_chain+1)
 
 
 
@@ -248,72 +65,53 @@ if (kappa_hat > 0) {
 
 
 
-# checking the parameter sensitivity
-# plot the transition distribution for different set of parameters
+obs_per_day <- 10
+total_obs <- length(S_simulated)
+
+# 对数收益率的数量 (比价格观测少 1)
+total_returns <- total_obs - 1
+
+# 确定完整的天数 (即收益率数量可以被 obs_per_day 整除的天数)
+num_full_days <- floor(total_returns / obs_per_day)
 
 
-library(ggplot2)
+# 裁剪收益率向量，使其长度恰好可以被 obs_per_day 整除
+required_returns_length <- num_full_days * obs_per_day
 
+# 计算对数收益率: r[t] = log(S[t]) - log(S[t-1])
+log_returns <- diff(log(S_simulated))
 
-source("Model_Simulation.R")
+# 裁剪对数收益率向量
+returns_trimmed <- log_returns[1:required_returns_length]
 
-set.seed(333)
-N <- 250
-v0 <- 0.04
-S0 <- 100
+# --- 3. 计算已实现方差 (Realized Variance) ---
 
-Reg_chain <- simulate_Reg(series_length = N)
-
-
-
-
-Reg_param_theta <- matrix(
-  
-  # feller condition: 2 * kappa * theta > sigma^2
-  c( # mu, kappa, theta, sigma, rho
-    0.5,   10,     0.03,  0.05,  -0.1, # calm
-    0.5,   5,     0.15,  0.05,  -0.1 # turbulent
-  ),
-  nrow = 2,
-  ncol = 5,
-  byrow = TRUE 
+# 将收益率重塑为矩阵，每列代表一天的收益率
+# 矩阵有 obs_per_day 行，num_full_days 列。
+returns_matrix <- matrix(
+  data = returns_trimmed,
+  nrow = obs_per_day, 
+  ncol = num_full_days,
+  byrow = FALSE # 确保每列是一个交易日内的 10 个收益率
 )
 
+# 计算每日已实现方差 (RV^2)
+# RV^2 = sum(r_j^2) for r_j within the day
+RV_squared_daily <- colSums(returns_matrix^2)
 
-# 62-144 regime change
-sim_series  <- simulate_heston(S0, v0, Reg_chain, Reg_param_theta, T, N, M=1, method = "M")
-S_simulated <- sim_series$S_paths[1,]
-plot(S_simulated,  type = "l")
-# S_mu_model <- fit_HMM(S_simulated, Reg_chain)
-# summary(S_mu_model)
-# S_mu_model
+# --- 4. 计算已实现波动率 (Realized Volatility) ---
+
+RV_daily <- sqrt(RV_squared_daily)
+
+# --- 5. 结果展示 ---
+
+cat("每日观测次数 (obs_per_day):", obs_per_day, "\n")
+cat("总共计算了多少天的 RV:", length(RV_daily), "\n\n")
+cat("已实现波动率 (RV_daily) 估计值:\n")
+print(RV_daily)
+
+plot(V_simulated, type = 'l', ylim = c(0,1))
+lines(rep(sqrt(RV_daily), each = 10), col = "blue")
 
 
-V_simulated <- sim_series$V_paths[1,]
 
-
-
-plot(S_simulated, type = "l")
-plot(V_simulated, type = "l")
-log_returns <- diff(log(S_simulated)) 
-volatility_proxy <- log_returns^2 
-plot(volatility_proxy)
-lines(V_simulated^2)
-# volatility_proxy <- log(volatility_proxy)
-states <- 2 
-
-cluster_results <- stats::kmeans(
-  volatility_proxy[!is.na(10 * volatility_proxy)], 
-  centers = states, 
-  iter.max = 100, 
-  nstart = 100 
-)
-cluster_assignment <- cluster_results$cluster 
-plot(Reg_chain+1, col = "blue")
-lines(cluster_assignment)
-
-  
-  
-  
-  
-  

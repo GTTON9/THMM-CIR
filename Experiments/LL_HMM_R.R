@@ -27,7 +27,7 @@ LL_HMM_R <- function(allprobs, Gamma, delta) {
   
   # --- Initialization (t = 1 in R, t=0 in C++) ---
   # phi(i, 0) = log(delta(i) * allprobs(i, 0));
-  phi[, 1] <- log(delta) + log(allprobs[, 1])
+  phi[, 1] <- log(delta) + allprobs[, 1]
   
   # --- Recursion (t = 2 to T in R, t=1 to T-1 in C++) ---
   # Outer loop iterates through time steps (columns)
@@ -48,7 +48,7 @@ LL_HMM_R <- function(allprobs, Gamma, delta) {
       
       # The final forward variable:
       # phi(i, t) = log(sum) + log(allprobs(i, t))
-      phi[i, t] <- log_sum_exp_result + log(allprobs[i, t])
+      phi[i, t] <- log_sum_exp_result + allprobs[i, t]
     }
   }
   
@@ -59,55 +59,5 @@ LL_HMM_R <- function(allprobs, Gamma, delta) {
   return(final_log_likelihood)
 }
 
-
-
-
-#' @title Hierarchical HMM Log-Likelihood (Forward Algorithm Extension)
-#' @description Calculates the log-likelihood for an extended HMM/HHMM, incorporating
-#'              an additional log-likelihood/cost term.
-#'
-#' @param log_likelihoods An M x T matrix of additional log-likelihood terms (e.g., O-M functional cost).
-#' @param allprobs A matrix of emission probabilities.
-#' @param Gamma The state transition probability matrix.
-#' @param delta The vector of initial state probabilities.
-#' @return The total log-likelihood of the observation sequence.
-LL_HHMM_R <- function(log_likelihoods, allprobs, Gamma, delta) {
-  
-  # M: Number of states (from delta vector length)
-  M <- length(delta)
-  # T: Length of sequence (from number of columns)
-  T <- ncol(allprobs) 
-  
-  # Initialize phi matrix (log-forward variables)
-  phi <- matrix(0, nrow = M, ncol = T)
-  
-  # --- Initialization (t = 1 in R, t=0 in C++) ---
-  # phi(i, 0) = log(delta(i)) + log_likelihoods(i, 0) + log(allprobs(i, 0));
-  phi[, 1] <- log(delta) + log_likelihoods[, 1] + log(allprobs[, 1])
-  
-  # --- Recursion (t = 2 to T in R, t=1 to T-1 in C++) ---
-  for (t in 2:T) {
-    
-    prev_phi <- phi[, t - 1]
-    
-    # Inner loop iterates through the current state (i)
-    for (i in 1:M) {
-      
-      # 1. Log-Sum-Exp for transitions:
-      # C++ equivalent of: phi.col(t - 1) + log(Gamma.col(i))
-      log_sum_terms <- prev_phi + log(Gamma[, i])
-      log_sum_exp_result <- log_sum_exp(log_sum_terms)
-      
-      # 2. Add emission terms:
-      # phi(i, t) = log(sum) + log_likelihoods(i, t) + log(allprobs(i, t));
-      phi[i, t] <- log_sum_exp_result + log_likelihoods[i, t] + log(allprobs[i, t])
-    }
-  }
-  
-  # --- Termination (Calculate final log-likelihood) ---
-  final_log_likelihood <- log_sum_exp(phi[, T])
-  
-  return(final_log_likelihood)
-}
 
 

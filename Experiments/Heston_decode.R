@@ -36,23 +36,23 @@ decode_states_heston <- function(x, verbose = TRUE) {
   ### apply Viterbi algorithm
   par <- parUncon2par_heston(x$estimate, x$data$controls)
 
-  # decoding <- viterbi(
-  #   observations = x$data$data,
-  #   nstates = x$data$controls$states[1],
-  #   Gamma = par$Gamma, kappa = par$kappa,
-  #   theta = par$theta, sigma = par$sigma)
+  decoding <- viterbi(
+    observations = x$data$data,
+    nstates = x$data$controls$states[1],
+    Gamma = par$Gamma, kappa = par$kappa,
+    theta = par$theta, sigma = par$sigma)
+
+  # params <- list(
+  #   kappa = par$kappa,   
+  #   theta = par$theta,
+  #   sigma = par$sigma)   
   # 
-  params <- list(
-    kappa = par$kappa,   
-    theta = par$theta,
-    sigma = par$sigma)   
-  
-  decoding <- viterbi_mdp_heston(obs = x$data$data, 
-                                 nstates = x$data$controls$states[1],
-                                 trans_matrix = par$Gamma, 
-                                 params = params, 
-                                 dt =1/252, 
-                                 G_approx = T)
+  # decoding <- viterbi_mdp_heston(obs = x$data$data, 
+  #                                nstates = x$data$controls$states[1],
+  #                                trans_matrix = par$Gamma, 
+  #                                params = params, 
+  #                                dt =1/252, 
+  #                                G_approx = T)
  
     
   ### save decoding in 'x' and return 'x'
@@ -118,6 +118,7 @@ viterbi <- function(
   # allprobs <- matrix(0, nstates, T)
   allprobs <- matrix(NA_real_, nstates, T)
   for (i in seq_len(nstates)) {
+
     allprobs[i, ] <- get_transition_density_heston_ln(observations, kappa[i], theta[i], sigma[i])
   }
 
@@ -137,6 +138,8 @@ viterbi <- function(
   for (t in rev(seq_len(T - 1))) {
     iv[t] <- which.max(xi[, t] + Gamma[, iv[t + 1]])
   }
+  
+  
   return(iv)
 }
 
