@@ -79,12 +79,14 @@ simulate_heston <- function(S0, v0, Reg_series, Reg_param, T, N, M, method = "E"
     # asset dynamics - use variance at previous step (explicit)
     S_prev <- S_paths[, i]
     # S_paths[, i + 1] <- S_prev + mu_curr * S_prev * dt + S_prev * sqrt_V_prev * dW1
-    S_paths[, i + 1] <- S_prev * exp((mu_curr - 0.5 * V_prev_raw) * dt + sqrt_V_prev * dW1)
+    
+    # S_paths[, i + 1] <- S_prev * (1 + mu_curr * dt + sqrt_V_prev * dW1)
+    S_paths[, i + 1] <- S_prev * exp((mu_curr - 0.5 * V_prev_pos) * dt + sqrt_V_prev * dW1)
     
     }
 
   sample_indices <- seq(1, N + 1, by = 100)
-
+  # 
   S_paths<- S_paths[, sample_indices]
   V_paths <- V_paths[, sample_indices]
   return(list(S_paths = S_paths, V_paths = V_paths, method_used = method))

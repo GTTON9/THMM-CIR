@@ -1,3 +1,7 @@
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+
 
 forward_filter <- function(observations, nstates, Gamma, kappa, theta, sigma) {
   
@@ -36,6 +40,13 @@ forward_filter <- function(observations, nstates, Gamma, kappa, theta, sigma) {
               states_estimate = as.vector(reg)))
 }
 
+logsumexp <- function(x) {
+  
+  m <- max(x)
+  
+  m + log(sum(exp(x - m)))
+  
+}
 
 plot_viterbi <- function(V_simulated, nstates, Gamma, kappa, theta, sigma, Reg_chain){
   
@@ -56,11 +67,10 @@ plot_viterbi <- function(V_simulated, nstates, Gamma, kappa, theta, sigma, Reg_c
   
   state_data <- data.frame(
     Time = time_index,
-    Estimated_State = states_estimate - 1, 
-    True_State = Reg_chain - 1        
+    Estimated_State = states_estimate -1, 
+    True_State = as.factor(Reg_chain)        
   )
 
-  
   prob_data_long <- pivot_longer(
     prob_data,
     cols = starts_with("Prob_"),
@@ -69,38 +79,19 @@ plot_viterbi <- function(V_simulated, nstates, Gamma, kappa, theta, sigma, Reg_c
   )
   
   
+
+
+  max_time <- max(state_data$Time) 
+  regime_start_times <- state_data %>%
+    mutate(change = True_State != lag(True_State, default = first(True_State))) %>%
+    filter(change | row_number() == 1) %>% 
+    select(Time, True_State) %>%
+    mutate(Time_End = lead(Time, default = max_time + 1)) %>% 
+    rename(Time_Start = Time)
   
   
-  
-  time_index <- 1:ncol(a) # 假设时间索引从 1 到 N
-  
-  prob_data <- data.frame(
-    Time = time_index,
-    Prob_State1 = a[1,],
-    Prob_State2 = 1 - a[1,]
-  )
-  
-  # --- 步骤 2: 创建状态链数据框 ---
-  state_data <- data.frame(
-    Time = time_index,
-    Estimated_State = states_estimate - 1, # 确保状态为 0/1
-    True_State = Reg_chain - 1             # 确保状态为 0/1
-  )
-  
-  # --- 步骤 3: 转换概率数据为长格式 (用于 ggplot 的多线绘制) ---
-  library(tidyr)
-  prob_data_long <- pivot_longer(
-    prob_data,
-    cols = starts_with("Prob_"),
-    names_to = "Probability_Type",
-    values_to = "Probability"
-  )
-  
-  
-  
-plot <-   ggplot() +
+plot <- ggplot() +
     
-    # I. 背景色区域 (突出 True Regime)
     geom_rect(
       data = regime_start_times,
       aes(
@@ -114,7 +105,7 @@ plot <-   ggplot() +
       inherit.aes = FALSE
     ) +
     
-    # II. 后验概率线 (主要信息)
+  
     geom_line(
       data = prob_data_long, 
       aes(x = Time, y = Probability, color = Probability_Type), # Probability_Type 映射到颜色图例
@@ -131,17 +122,18 @@ plot <-   ggplot() +
       alpha = 0.8
     ) +
     
-    # --- 调整和标签 ---
+
     scale_fill_manual(
       values = c("0" = "skyblue", "1" = "salmon"), 
       labels = c("0" = "Regime 1 (Calm)", "1" = "Regime 2 (Turbulent)"),
       name = "True Regime Background"
     ) +
-    scale_color_manual(
-      values = c("Prob_State1" = "blue", "Prob_State2" = "red"),
-      labels = c("Prob_State1" = "P(State 1)", "Prob_State2" = "P(State 2)"),
-      name = "Posterior Probability"
-    ) +
+  scale_color_manual(
+    values = c("Prob_State1" = "blue", "Prob_State2" = "red"),
+    labels = c("Prob_State1" = expression(P(X[1:t], S[t] == 1 * " | " * bold(theta))),
+               "Prob_State2" = expression(P(X[1:t], S[t] == 2 * " | " * bold(theta)))),
+               name = "Forward Probability" 
+    )+
     scale_shape_manual(
       # 定义 'Estimated State' 对应的形状为 'x' (pch=4)
       values = c("Estimated State" = 1), 

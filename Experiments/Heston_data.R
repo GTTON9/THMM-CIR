@@ -107,9 +107,11 @@ prepare_data <- function(controls, true_parameters = NULL, seed = NULL) {
       controls = controls, true_parameters = true_parameters, seed = seed
     )
   } else {
+
     data <- read_data(controls)
+
   }
-  
+
   ### build and return object of class 'Heston_data'
   Heston_data(
     dates = data$dates,

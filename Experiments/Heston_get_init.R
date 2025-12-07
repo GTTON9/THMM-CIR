@@ -296,7 +296,7 @@ Heston_get_init<- function(
     parameter_class <- gsub("_.*", "", names(initial_estimate))
     for (class in unique(parameter_class)) {
       id <- which(parameter_class == class)
-      jittered[, id] <- jitter(jittered[, id], factor = 5)
+      jittered[, id] <- jitter(jittered[, id], factor = 10)
     }
 
     lapply(seq_len(N), function(i) {

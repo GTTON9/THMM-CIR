@@ -27,7 +27,6 @@ Heston_nLL_hmm <- function(parUncon, observations, controls) {
   nstates <- controls[["states"]][1]
 
   par <- parUncon2par_heston(parUncon, controls, FALSE, numerical_safeguard = TRUE)
-  Heston_trace$par_list[[length(Heston_trace$par_list) + 1]] <- par
   
   
   # print("----- likelihood par-----")
