@@ -12,105 +12,8 @@ source("Heston_decode.R")
 source("Heston_likelihood.R")
 source("Viterbi_Visual.R")
 
-Gen_fit <- function(Gamma, mu, kappa, theta, sigma, rho, gen_length = 252, V_0 = 0.03, S0 = 100,  V_ = TRUE , plot_path = TRUE, seed = 999){
-  # V_: whether we know the volatility process
-  
-  set.seed(999)
-  N <- gen_length
-  Reg_chain <- simulate_Reg(series_length = N, Reg_tran = Gamma)
-  Reg_param <- cbind(mu, kappa, theta, sigma, rho)
-  sim_series  <- simulate_heston(S0, v0, Reg_chain, Reg_param, T, N, M=1, method = "E", seed = seed)
-  S_simulated <- sim_series$S_paths
-  print(S_simulated)
-  V_simulated <- sim_series$V_paths
-  
-  
-  par(mfrow = c(1, 2))
-  if(plot_path){
-    plot(
-      S_simulated,
-      type = "l",
-      main = "S path",
-      col = "blue")
-    
-    plot(
-      V_simulated,
-      type = "l",
-      main = "V path",
-      col = "red"
-    )
-  }
-  par(mfrow = c(1, 1))
-  
-  if(V_){
-    
-  }
-  
-  
-  series_length <- length(V_simulated)
-  start_date <- as.Date("2024-01-01")
-  date_sequence <- seq(from = start_date, by = "day", length.out = series_length)
-  
-  
-  
-  my_data_df <- data.frame(
-    Date = date_sequence,
-    Var = V_simulated
-  )
-  
-  
-  series_control <- Heston_set_controls( 
-    states      = 2,     # 2 state
-    sdds        = "Heston",         
-    date_column = "Date",
-    file        = my_data_df, 
-    data_column = "Var",      
-    logreturns  = FALSE,         
-    from        = date_sequence[1],             
-    to          = date_sequence[length(date_sequence)],
-    runs = 10
-  )
-  
-  
-  data_hmm <- prepare_data(series_control)
-  model_hmm <- Heston_fit_model(data_hmm) 
-  
-  final_model <- decode_states_heston(model_hmm) 
-  states_estimate <- final_model$decoding
-  states_estimate
 
-  plot(states_estimate, col = "blue")
-  lines(Reg_chain+1)
-  param <- parUncon2par_heston(final_model$estimate, series_control, FALSE, numerical_safeguard = TRUE)
-  
-  
-  p <- plot_viterbi(V_simulated, nstates, param$Gamma, 
-               param$kappa, param$theta, 
-               param$sigma, Reg_chain)
-  plot(p)
-  
-  
-  return(list(states_estimate = states_estimate, 
-              param = param,
-              fisher_inverse = final_model$inverse_fisher))
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Gen_fit <- function(Gamma, mu, kappa, theta, sigma, rho, input_ = "V_", gen_length = 252, V_0 = 0.03, S0 = 100,  V_ = TRUE , plot_path = TRUE, seed = 999){
+Gen_fit <- function(Gamma, mu, kappa, theta, sigma, rho, input_ = "V_", gen_length = 252, v0 = 0.03, S0 = 100,  V_ = TRUE , plot_path = TRUE, seed = 999){
   # V_: whether we know the volatility process
   
   set.seed(999)
@@ -193,9 +96,9 @@ Gen_fit <- function(Gamma, mu, kappa, theta, sigma, rho, input_ = "V_", gen_leng
     Reg_chain <- rep(Reg_chain_year, each = 100)
     
     Reg_param <- cbind(mu, kappa, theta, sigma, rho)
-    sim_series  <- simulate_heston(S0, v0, Reg_chain, Reg_param, T, N, M=1, method = "E", seed = seed)
+    sim_series  <- simulate_heston(S0, v0, Reg_chain, Reg_param, T, N, M=1, method = "E",interp = T, seed = seed)
     S_simulated <- sim_series$S_paths
-    print(S_simulated)
+
     V_simulated <- sim_series$V_paths
     
     
@@ -220,7 +123,7 @@ Gen_fit <- function(Gamma, mu, kappa, theta, sigma, rho, input_ = "V_", gen_leng
     
     
     S <- S_simulated
-    n_days <- 250
+    n_days <- gen_length
     n_intraday <- 100
     
     RV_V <- numeric(n_days)
@@ -233,24 +136,14 @@ Gen_fit <- function(Gamma, mu, kappa, theta, sigma, rho, input_ = "V_", gen_leng
     }
     
     
-    
-    plot(V_simulated[seq(1, length(V_simulated), by = 100)], type = 'l', ylim = c(0,1), col = "black")
+    plot(V_simulated[seq(1, length(V_simulated), by = 100)], type = 'l', col = "black")
     lines(RV_V, col = "blue")
     lines(lowess(RV_V, f = 0.1), col = "red")
-    legend("topright", 
-           legend = c("True Variance (V_t)", 
-                      "Realized Variance Estimate", 
-                      "Smoothed RV (lowess, f=0.1)"),
-           col = c("black", "blue", "red"),
-           lwd = c(2, 1.5, 2),
-           lty = c(1, 1, 2),
-           bty = "n",
-           cex = 0.5)
+  
     
     
-    
-    RV_V <- lowess(RV_V, f = 0.1)$y
-    
+    # RV_V <- lowess(RV_V, f = 0.1)$y
+
     
     
     
@@ -264,9 +157,8 @@ Gen_fit <- function(Gamma, mu, kappa, theta, sigma, rho, input_ = "V_", gen_leng
       Var = RV_V
     )
     colnames(my_data_df) <- c("Date", "Var")
-    
-    
-    source("Gen_fit.R")
+
+
     
     # followed the example
     series_control <- Heston_set_controls( 
@@ -294,7 +186,7 @@ Gen_fit <- function(Gamma, mu, kappa, theta, sigma, rho, input_ = "V_", gen_leng
     param <- parUncon2par_heston(final_model$estimate, series_control, FALSE, numerical_safeguard = TRUE)
     
     
-    p <- plot_viterbi(V_simulated, nstates, param$Gamma, 
+    p <- plot_viterbi(RV_V, nstates, param$Gamma, 
                       param$kappa, param$theta, 
                       param$sigma, Reg_chain_year)
     plot(p)

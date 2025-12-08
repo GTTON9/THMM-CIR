@@ -1,5 +1,5 @@
 
-simulate_heston <- function(S0, v0, Reg_series, Reg_param, T, N, M, method = "E", seed = 999, min_var = 1e-6) {
+simulate_heston <- function(S0, v0, Reg_series, Reg_param, T, N, M, method = "E", interp = TRUE, seed = 999, min_var = 1e-6) {
   if (!is.null(seed)) set.seed(seed)
   
   # Check Feller (just warn)
@@ -7,9 +7,11 @@ simulate_heston <- function(S0, v0, Reg_series, Reg_param, T, N, M, method = "E"
       2 * Reg_param[2,2] * Reg_param[2,3] < Reg_param[2,4]^2) {
     message("Warning: Feller condition (2*kappa*theta > sigma^2) NOT satisfied in at least one regime.")
   }
-  N <-  N * 100
-  Reg_series <- rep(Reg_series, each = 100)
-
+  if(interp){
+    N <-  N * 100
+    Reg_series <- rep(Reg_series, each = 100)
+  }
+  
   dt <- (T / N) 
 
   sqrt_dt <- sqrt(dt)
@@ -84,11 +86,15 @@ simulate_heston <- function(S0, v0, Reg_series, Reg_param, T, N, M, method = "E"
     S_paths[, i + 1] <- S_prev * exp((mu_curr - 0.5 * V_prev_pos) * dt + sqrt_V_prev * dW1)
     
     }
+  if(interp){
+    sample_indices <- seq(1, N + 1, by = 100)
+    S_paths<- S_paths[, sample_indices]
+    V_paths <- V_paths[, sample_indices]
+  }else{
+    S_paths<- as.vector(S_paths)
+    V_paths <- as.vector(V_paths)
+  }
 
-  sample_indices <- seq(1, N + 1, by = 100)
-  # 
-  S_paths<- S_paths[, sample_indices]
-  V_paths <- V_paths[, sample_indices]
   return(list(S_paths = S_paths, V_paths = V_paths, method_used = method))
 }
 

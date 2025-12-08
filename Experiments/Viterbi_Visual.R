@@ -52,10 +52,9 @@ plot_viterbi <- function(V_simulated, nstates, Gamma, kappa, theta, sigma, Reg_c
   
   
   prob <- forward_filter(V_simulated, nstates, Gamma, kappa, theta, sigma)
-  states_estimate <- as.vector(prob$states_estimate)
+  states_estimate <- prob$states_estimate
   a <- prob$posterior
-  # states_estimate <- viterbi(V_simulated, nstates, Gamma, kappa, theta, sigma)
-  
+
   time_index <- 1:ncol(a) # 假设时间索引从 1 到 N
   
   prob_data <- data.frame(
@@ -63,14 +62,16 @@ plot_viterbi <- function(V_simulated, nstates, Gamma, kappa, theta, sigma, Reg_c
     Prob_State1 = a[1,],
     Prob_State2 = 1 - a[1,]
   )
-  
+ 
   
   state_data <- data.frame(
     Time = time_index,
     Estimated_State = states_estimate -1, 
-    True_State = as.factor(Reg_chain)        
+    True_State = as.factor(Reg_chain[1:ncol(a)])        
   )
-
+  
+  
+print("np")
   prob_data_long <- pivot_longer(
     prob_data,
     cols = starts_with("Prob_"),

@@ -158,7 +158,7 @@ plot(states_estimate, col = "blue")
 lines(Reg_chain_year+1)
 
 
-Gen_fit(Gamma, mu, kappa, theta, sigma, rho,  V_ = TRUE , plot_path = TRUE)
+Gen_fit_1(Gamma, mu, kappa, theta, sigma, rho,  V_ = TRUE , plot_path = TRUE)
 
-Gen_fit(Gamma, mu, kappa, theta, sigma, rho, input_ = "V_",  V_ = TRUE , plot_path = TRUE)
+Gen_fit_1(Gamma, mu, kappa, theta, sigma, rho, input_ = "S_",  V_ = TRUE , plot_path = TRUE)
 
