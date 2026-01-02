@@ -1,20 +1,25 @@
-source("Model_Simulation.R")
-source("Heston_likelihood.R")
-source("Heston_decode.R")
-
+# source("Model_Simulation.R")
+# source("Heston_likelihood.R")
+# source("Heston_decode.R")
+# 
 
 # easy case
 
 Gamma <- matrix(c(0.99, 0.01, 0.01, 0.99), 2, 2)
 N <- 252
-v0 <- 0.03
+
+v0 <- 0.1
 S0 <- 100
 nstates = 2
-mu <- c(0.5, 0.5)
+T = 1
+n_days <- 252
+n_intraday <- 2400
+mu <- c(0.3, 0.3)
 kappa <- c(10, 5)
-theta <- c(0.03, 0.6)
-sigma <- c(0.05, 0.05)
+theta <- c(0.1, 0.5)
+sigma <- c(0.1, 0.1)
 rho <- c(-0.1, -0.1)
+
 
 
 
@@ -35,7 +40,10 @@ states_estimate
 plot(states_estimate, col = "blue")
 lines(Reg_chain+1)
 
-
+p <- plot_viterbi(RV_V, nstates, Gamma, 
+                  kappa, theta, 
+                  sigma, Reg_chain_year)
+plot(p)
 
 
 
