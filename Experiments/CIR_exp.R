@@ -89,8 +89,20 @@ states_estimate
 plot(states_estimate, type = "s", col = "blue")
 lines(Reg_chain+1)
 # final estimation
-parUncon2par_heston(final_model$estimate, series_control, FALSE, numerical_safeguard = TRUE)
+param <- parUncon2par_heston(final_model$estimate, series_control, FALSE, numerical_safeguard = TRUE)
 
 
+
+
+result <- plot_cir_confidence_simple(
+  true_vol = V_simulated,
+  param = param,
+  states_estimate = states_estimate,
+  dt = 1/252,
+  interval_step = 10
+)
+
+# 显示图
+print(result$plot)
 
 

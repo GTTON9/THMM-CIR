@@ -1,0 +1,30 @@
+========================================
+O-M THMM Fitting Log -  2025-12-25 19:48:36.902586 
+========================================
+Generating initial values for O-M THMM...
+  [1] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
+ [47] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1
+ [93] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+[139] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
+[185] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
+[231] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
+[1] "Initial Estimate"
+$kappa
+[1] 0.8406605 0.3852617
+
+$theta
+[1] 0.3367647 0.1291381
+
+$sigma
+[1] 0.1769700 0.1583229
+
+$Gamma
+            [,1]       [,2]
+[1,] 0.988372093 0.01162791
+[2,] 0.006060606 0.99393939
+
+Checking start values...
+                                             Maximizing O-M likelihood...
+Error: None of the estimation runs ended successfully.
+Adapt 'accept' or increase 'runs' in 'controls'.
+Error in close.connection(con) : cannot close 'message' sink connection
